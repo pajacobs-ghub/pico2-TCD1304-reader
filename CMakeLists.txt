@@ -25,7 +25,7 @@ add_executable(tcd1304_reader
         )
 
 # pull in common dependencies
-target_link_libraries(tcd1304_reader pico_stdlib hardware_adc)
+target_link_libraries(tcd1304_reader pico_stdlib hardware_adc hardware_i2c)
 
 # enable uart0
 pico_enable_stdio_uart(tcd1304_reader 1)

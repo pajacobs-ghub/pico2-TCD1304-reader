@@ -5,22 +5,29 @@
 // PJ 2024-12-30: simple interpreter and simple sampling
 //    2024-12-31: add adc_capture() function from adc_console example
 //    2024-12-31: port to dedicated stripboard with TCD1304DG board attached.
+//    2025-01-01: added period-setting command (via I2C to driver board)
 //
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
 #include "hardware/uart.h"
+#include "hardware/i2c.h"
 #include "pico/binary_info.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
 
-#define VERSION_STR "v0.1 2024-12-31 TCD1304DG linear-image-sensor reader"
+#define VERSION_STR "v0.2 2025-01-01 TCD1304DG linear-image-sensor reader"
 
 const uint LED_PIN = PICO_DEFAULT_LED_PIN;
 uint8_t override_led = 0;
 const uint ICG_PIN = 16;
+
+// I2C communication with PIC18F16Q41 driver board.
+const uint SDA_PIN = 20;
+const uint SCL_PIN = 21;
+uint8_t msg_bytes[4];
 
 // We want to capture a batch of samples.
 const uint ADC_PIN = 26;
@@ -133,6 +140,47 @@ void interpret_command(char* cmdStr)
 			printf("%u\n", adc_samples[j]);
 		}
 		break;
+	case 'p':
+		// Set the SH and ICG periods (counts of microseconds).
+		// The clocking out of the Vos data takes about 7.5 milliseconds,
+		// so a good minimum value of us_ICG is 8000.
+		// To keep the signals aligned, us_ICG needs to be a multiple of us_SH.
+		// For example a command that works nicely (on my desktop setup) is
+		// p 200 10000\n
+		// These periods are the default values in the PIC18 MCU.
+		// To get a longer exposure and read a bit quicker the command might be
+		// p 400 8000\n
+		// This saturates the sensor under my lighting conditions.
+		//
+		token_ptr = strtok(&cmdStr[1], sep_tok);
+		if (token_ptr) {
+			// Found some non-blank text; assume on/off value.
+			// Use just the least-significant bit.
+			uint16_t us_SH = (uint16_t) atoi(token_ptr);
+			token_ptr = strtok(NULL, sep_tok);
+			if (token_ptr) {
+				uint16_t us_ICG = (uint16_t) atoi(token_ptr);
+				// Big-endian layout of bytes in message.
+				msg_bytes[0] = (uint8_t) ((us_SH & 0xff00) >> 8);
+				msg_bytes[1] = (uint8_t) (us_SH & 0x00ff);
+				msg_bytes[2] = (uint8_t) ((us_ICG & 0xff00) >> 8);
+				msg_bytes[3] = (uint8_t) (us_ICG & 0x00ff);
+				uint8_t addr = 0x51;
+				int nresult = i2c_write_blocking(i2c0, addr, msg_bytes, 4, false);
+				if (nresult != 4) {
+					printf("p error: unsuccessful I2C communication\n");
+				} else {
+					// Successfully sent the I2C message; report the values sent.
+					printf("p %d %d\n", us_SH, us_ICG);
+				}
+			} else {
+				printf("p error: no value for us_ICG\n");
+			}
+		} else {
+			// There was no text to give a value.
+			printf("p error: no value for us_SH (nor us_ICG)\n");
+		}
+		break;
 	default:
 		printf("%c error: Unknown command\n", cmdStr[0]);
     }
@@ -148,6 +196,7 @@ int main()
     bi_decl(bi_1pin_with_name(ADC_PIN, "ADC input pin"));
     bi_decl(bi_1pin_with_name(LED_PIN, "LED output pin"));
 	bi_decl(bi_1pin_with_name(ICG_PIN, "ICG sense pin (digital input)"));
+	bi_decl(bi_2pins_with_func(SDA_PIN, SCL_PIN, GPIO_FUNC_I2C));
     //
     gpio_init(LED_PIN);
     gpio_set_dir(LED_PIN, GPIO_OUT);
@@ -158,6 +207,12 @@ int main()
     adc_gpio_init(ADC_PIN);
     adc_select_input(0);
 	adc_fifo_setup(true, false, 0, false, false); // Just the FIFO, not the DMA
+	//
+	i2c_init(i2c0, 100*1000);
+	gpio_set_function(SDA_PIN, GPIO_FUNC_I2C);
+	gpio_set_function(SCL_PIN, GPIO_FUNC_I2C);
+	gpio_pull_up(SDA_PIN);
+	gpio_pull_up(SCL_PIN);
     //
     while (1) {
         // Characters are not echoed as they are typed.
