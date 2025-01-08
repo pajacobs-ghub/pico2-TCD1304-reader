@@ -6,6 +6,7 @@
 //    2024-12-31: add adc_capture() function from adc_console example
 //    2024-12-31: port to dedicated stripboard with TCD1304DG board attached.
 //    2025-01-01: added period-setting command (via I2C to driver board)
+//    2025-01-08: quick reporting of pixel data, using base64 encoding
 //
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
@@ -18,7 +19,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define VERSION_STR "v0.2 2025-01-01 TCD1304DG linear-image-sensor reader"
+#define VERSION_STR "v0.3 2025-01-08 TCD1304DG linear-image-sensor reader"
 
 const uint LED_PIN = PICO_DEFAULT_LED_PIN;
 uint8_t override_led = 0;
@@ -76,6 +77,14 @@ int getstr(char* buf, int nbuf)
     }
     return i;
 } // end getstr()
+
+//   0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
+const char base64_alphabet[64] = {
+	'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P',
+	'Q','R','S','T','U','V','W','X','Y','Z','a','b','c','d','e','f',
+	'g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v',
+	'w','x','y','z','0','1','2','3','4','5','6','7','8','9','+','/'
+};
 
 void interpret_command(char* cmdStr)
 // A command that does not do what is expected should return a message
@@ -136,8 +145,23 @@ void interpret_command(char* cmdStr)
 		break;
 	case 'r':
 		// Report the values of previously-captured analog values.
+		// Each uint16 value is formatted as a decimal integer and there is one per line.
 		for (size_t j=0; j < N_SAMPLES; ++j) {
 			printf("%u\n", adc_samples[j]);
+		}
+		break;
+	case 'q':
+		// Quickly report the values of previously-captured analog values.
+		// Each 12-bit value is formatted as a pair of characters using the base64 alphabet.
+		// There are 20 values per line so N_SAMPLES needs to be an exact multiple of 20.
+		for (size_t j=0; j < N_SAMPLES/20; ++j) {
+			for (size_t k=0; k < 20; ++k) {
+				uint16_t val = adc_samples[j*20 + k];
+				char hi = base64_alphabet[(val & 0x0FFF) >> 6];
+				char lo = base64_alphabet[val & 0x003F];
+				printf("%c%c", hi, lo);
+			}
+			printf("\n");
 		}
 		break;
 	case 'p':

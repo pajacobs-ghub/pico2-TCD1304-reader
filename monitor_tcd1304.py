@@ -2,6 +2,7 @@
 # Functions/procedure to talk to the RP3250 Pico2 that samples the TCD1304 output.
 #
 # Peter J. 2025-01-07
+#          2025-01-08 Use base64 encoding of pixel data to send fewer bytes.
 #
 import argparse
 import serial
@@ -100,6 +101,40 @@ def fetch_sampled_voltages(sp):
     data = [float(v) for v in txt_lines]
     return data
 
+#   0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
+base64_alphabet = [
+	'A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P',
+	'Q','R','S','T','U','V','W','X','Y','Z','a','b','c','d','e','f',
+	'g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v',
+	'w','x','y','z','0','1','2','3','4','5','6','7','8','9','+','/'
+]
+base64_values = {}
+for i in range(len(base64_alphabet)):
+    base64_values[base64_alphabet[i]] = i
+
+def decode_base64_text_line(txt):
+    data = []
+    for k in range(20):
+        hi = base64_values[txt[2*k]]
+        lo = base64_values[txt[2*k+1]]
+        data.append(float(hi*64+lo))
+    return data
+
+def fetch_sampled_voltages_quickly(sp):
+    '''
+    Tell the Pico2 to actually report the sample values.
+    The 12-bit sample values (0-4095) are reported by the Pico2
+    as pairs of base64 characters, 20 values per line.
+
+    Returns the sample values as list of floating-point values.
+    '''
+    send_command(sp, 'q')
+    txt_lines = get_long_text_response(sp, 3800/20)
+    data = []
+    for txt in txt_lines:
+        data.extend(decode_base64_text_line(txt))
+    return data
+
 def set_SH_ICG_periods(sp, sh_us=200, icg_us=10000):
     '''
     sh_us sets the exposure period in microseconds
@@ -140,7 +175,7 @@ if __name__ == '__main__':
         sp.reset_input_buffer()
         sp.reset_output_buffer()
         print(get_pico_version_string(sp))
-        set_SH_ICG_periods(sp, 100, 8000)
+        set_SH_ICG_periods(sp, 300, 8400)
         print("Once sampling begins, use Ctrl-C (keyboard interrupt) to stop.")
         #
         # We explicitly start the graphics event loop so that we can later
@@ -158,7 +193,7 @@ if __name__ == '__main__':
         # First collection of pixel data.
         stats = sample_tcd1304_voltages(sp)
         print(f"stats={stats}")
-        data = fetch_sampled_voltages(sp)
+        data = fetch_sampled_voltages_quickly(sp)
         N = len(data)
         print(f"number of samples = {N}")
         line1, = ax.plot(data)
@@ -168,7 +203,7 @@ if __name__ == '__main__':
             while True:
                 stats = sample_tcd1304_voltages(sp)
                 print(f"stats={stats}")
-                data = fetch_sampled_voltages(sp)
+                data = fetch_sampled_voltages_quickly(sp)
                 line1.set_ydata(data)
                 fig.canvas.flush_events()
         except KeyboardInterrupt:
