@@ -7,6 +7,7 @@
 //    2024-12-31: port to dedicated stripboard with TCD1304DG board attached.
 //    2025-01-01: added period-setting command (via I2C to driver board)
 //    2025-01-08: quick reporting of pixel data, using base64 encoding
+//    2025-01-09: run the serial port faster
 //
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
@@ -19,7 +20,7 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define VERSION_STR "v0.3 2025-01-08 TCD1304DG linear-image-sensor reader"
+#define VERSION_STR "v0.4 2025-01-09 TCD1304DG linear-image-sensor reader"
 
 const uint LED_PIN = PICO_DEFAULT_LED_PIN;
 uint8_t override_led = 0;
@@ -215,6 +216,7 @@ void interpret_command(char* cmdStr)
 int main()
 {
     stdio_init_all();
+	uart_set_baudrate(uart0, 460800);
     // Some information for picotool.
     bi_decl(bi_program_description(VERSION_STR));
     bi_decl(bi_1pin_with_name(ADC_PIN, "ADC input pin"));

@@ -3,6 +3,7 @@
 #
 # Peter J. 2025-01-07
 #          2025-01-08 Use base64 encoding of pixel data to send fewer bytes.
+#          2025-01-09 Use faster serial speed.
 #
 import argparse
 import serial
@@ -23,7 +24,7 @@ def openPort(port='/dev/ttyUSB0'):
     '''
     sp = None
     try:
-        sp = serial.Serial(port, 115200, rtscts=0, timeout=1.0)
+        sp = serial.Serial(port, 460800, rtscts=0, timeout=1.0)
     except serial.serialutil.SerialException:
         print(f'Did not find serial port: {port}')
         print(f'Serial ports that can be seen: {serial_ports()}')
