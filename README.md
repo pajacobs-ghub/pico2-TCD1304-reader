@@ -3,7 +3,7 @@ Introduction
 
 The care and feeding of the TCD1304DG linear image sensor is done in three parts.
 A PIC18F16Q41 microcontroller drives the SH, ICG ande master clock pins of the 
-sensor such that it outputs the pixel values as a time-varying analog voltage.
+sensor such that it outputs the pixel data as a time-varying analog voltage.
 The RP2350 microcontroller on the Pico2 board samples that analog voltage and converts 
 the pixel data into digital values, which are then sent (via the serial port) 
 to a supervisory program that is running on a PC.
@@ -39,7 +39,9 @@ The `b` command tells the Pico2 to convert a batch of pixel voltages to numbers 
 Once the Pico2 receives this command, it waits for a suitable point in time when the voltages from the pixels are about to be clocked out and then samples the output pin at 500k samples/s for a little under 8 milliseconds.
 The overall time depends on just when the Pico2 starts looking at the clocking signals.
 Since the PIC18F16Q41 driver MCU is running independently and continuously clocking the TCD1304 with SH, ICG and a 2MHz master clock, the Pico2 has to watch and wait for a rising edge of the ICG signal.
-On completion of converting the voltages to numbers in the array, the Pico2 computes a couple of stats and reports them as its (single-line) response. 
+On completion of converting the voltages to numbers in the array, the Pico2 computes 
+the mean, standard deviation and the time (in microseconds) to collect the data
+and reports those stats as its (single-line) response. 
 
 The `r` command tells the Pico2 to report the numbers (pixel data) 
 that it has stored in that array.
