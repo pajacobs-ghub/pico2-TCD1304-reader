@@ -60,12 +60,14 @@ The `p` command gets the Pico2 to talk to the PIC18F16Q41 MCU to adjust
 the SH and ICG clocking signals.
 For example `p 300 8400` will set the SH and ICG periods to 300 microseconds 
 and 8400 microseconds, respectively.
-Note that the ICG period needs to be a multiple of the SH period 
-for the pixel voltages to be output correctly.
-The minimum value for SH is 10 microseconds and 
-the minimum value of ICG should be around 8000 microseconds.
-Maximum values are around 32000 for both because the PIC18 accepts the values
-as 16-bit signed integers.
+Notes:
+- At power-up, initial values (coded into the PIC18 MCU) are 200 for SH and 10000 for ICG.
+- The ICG period needs to be a multiple of the SH period 
+  for the pixel voltages to be output correctly.
+- The minimum value for SH is 10 microseconds and 
+  the minimum value of ICG should be around 8000 microseconds.
+- Maximum values are around 32000 for both because the PIC18 accepts the values
+  as 16-bit signed integers.
 
 
 Licence
